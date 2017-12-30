@@ -51,6 +51,13 @@ namespace thiproxy
 
 		void callback_connect(const boost::system::error_code & error);
 
+
+		void callback_tunnel_down_read(const boost::system::error_code & error, size_t len);
+		void callback_tunnel_down_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len);
+
+		void callback_tunnel_up_read(const boost::system::error_code & error, size_t len);
+		void callback_tunnel_up_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len);
+
 		int _status;
 
 		//Sockets src/dst
@@ -64,6 +71,7 @@ namespace thiproxy
 		//Send/Recv buffers
 		std::string _buffer_headers;
 		std::string _buffer_request;
+
 
 		//HTTP body
 		std::size_t _body_len;

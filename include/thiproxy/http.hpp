@@ -74,7 +74,7 @@ namespace thiproxy
 						_uri_port = 80;
 				}
 
-				_uri = _uri.substr( p0 , p1 - p0);
+				_uri = _uri.substr( p0 , std::min(p1,p2) - p0);
 			}
 
 			

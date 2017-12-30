@@ -120,6 +120,35 @@ namespace thiproxy
 
 		_status = STATUS_CONNECTED;
 
+		if(_con_tunnel)
+		{
+			_status = STATUS_CONNECTED;
+
+			std::string res_http_ok = "HTTP/1.1 200 OK\r\n\r\n";
+			boost::asio::async_write(_down_socket, boost::asio::buffer(res_http_ok),
+			boost::bind(&Session::callback_tunnel_down_write, shared_from_this(),
+									std::vector<char>(),
+									0,
+									boost::asio::placeholders::error,
+									boost::asio::placeholders::bytes_transferred));
+
+
+			//Start reading from down/up
+			async_read(_down_socket, boost::asio::buffer(_down_buffer), boost::asio::transfer_at_least(1),
+						    boost::bind(&Session::callback_tunnel_down_read,
+							shared_from_this(), 
+							boost::asio::placeholders::error,
+							boost::asio::placeholders::bytes_transferred));
+
+			async_read(_up_socket, boost::asio::buffer(_up_buffer), boost::asio::transfer_at_least(1),
+						    boost::bind(&Session::callback_tunnel_up_read,
+							shared_from_this(), 
+							boost::asio::placeholders::error,
+							boost::asio::placeholders::bytes_transferred));
+
+			return;
+		}
+
 		_buffer_request = _buffer_headers;
 		_buffer_headers.clear();
 
@@ -276,6 +305,103 @@ namespace thiproxy
 			finish("Con Closed");
 		}
 
+	}
+
+	void Session::callback_tunnel_down_read(const boost::system::error_code & error, size_t len)
+	{
+		if(error)
+		{
+			//std::cout << "[Tunnel EOF] Down" << std::endl;
+			finish();
+			
+		}
+		else
+		{
+
+			
+
+			if(error != boost::asio::error::eof && len > 0)
+			{
+				std::vector<char> copy_data(len);
+				boost::asio::buffer_copy( boost::asio::buffer(copy_data,len) ,boost::asio::buffer(_down_buffer,len));
+
+				callback_tunnel_up_write(copy_data, len, boost::system::error_code(), len);
+			}
+
+			async_read(_down_socket, boost::asio::buffer(_down_buffer), boost::asio::transfer_at_least(1),
+							    boost::bind(&Session::callback_tunnel_down_read,
+								shared_from_this(), 
+								boost::asio::placeholders::error,
+								boost::asio::placeholders::bytes_transferred));
+
+
+		}
+	}
+
+	void Session::callback_tunnel_down_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len)
+	{
+
+		//std::cout << "[Tunnel Write] Down" << write_size << " len " << len << std::endl;
+		
+		if(write_size > 0)
+		{
+			boost::asio::async_write(_down_socket, boost::asio::buffer(write_buffer,write_size),
+			boost::bind(&Session::callback_tunnel_down_write, shared_from_this(),
+									std::vector<char>(),
+									0,
+									boost::asio::placeholders::error,
+									boost::asio::placeholders::bytes_transferred));
+		}
+
+
+	
+
+	}
+
+	void Session::callback_tunnel_up_read(const boost::system::error_code & error, size_t len)
+	{
+		if(error )
+		{
+			//std::cout << "[Tunnel ERROR] Up" << std::endl;
+			finish();
+			
+		}
+		else
+		{
+		
+
+			if(error != boost::asio::error::eof && len > 0)
+			{
+				std::vector<char> copy_data(len);
+				boost::asio::buffer_copy( boost::asio::buffer(copy_data,len) ,boost::asio::buffer(_up_buffer,len));
+
+				callback_tunnel_down_write(copy_data, len, boost::system::error_code(), len);
+			}
+			
+			
+			async_read(_up_socket, boost::asio::buffer(_up_buffer), boost::asio::transfer_at_least(1),
+						    boost::bind(&Session::callback_tunnel_up_read,
+							shared_from_this(), 
+							boost::asio::placeholders::error,
+							boost::asio::placeholders::bytes_transferred));
+
+		}
+	}
+
+	void Session::callback_tunnel_up_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len)
+	{
+		//std::cout << "[Tunnel Write] Up" << write_size <<  std::endl;
+		
+		if(write_size > 0)
+		{
+			boost::asio::async_write(_up_socket, boost::asio::buffer(write_buffer,write_size),
+			boost::bind(&Session::callback_tunnel_up_write, shared_from_this(),
+									std::vector<char>(),
+									0,
+									boost::asio::placeholders::error,
+									boost::asio::placeholders::bytes_transferred));
+		}
+		
 	}
 }
 
