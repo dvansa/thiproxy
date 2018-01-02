@@ -1,3 +1,23 @@
+/*
+* session.hpp implementations.
+*
+*
+* Copyright (C) 2018 Daniel van Sabben Alsina
+*
+* This program is free software: you can redistribute it and/or modify
+* it under the terms of the GNU General Public License as published by
+* the Free Software Foundation, either version 3 of the License, or
+* (at your option) any later version.
+*
+* This program is distributed in the hope that it will be useful,
+* but WITHOUT ANY WARRANTY; without even the implied warranty of
+* MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+* GNU General Public License for more details.
+*
+* You should have received a copy of the GNU General Public License
+* along with this program.  If not, see <http://www.gnu.org/licenses/>.
+*
+*/
 #include "thiproxy/session.hpp"
 
 namespace thiproxy
@@ -33,7 +53,7 @@ namespace thiproxy
 
 	void Session::finish(const std::string & reason)
 	{
-		std::cout << "[Finished]" << reason << " --- Req: " << _http_header_req.uri() <<  std::endl;
+		std::cout << "[Session Finished] " << reason <<  std::endl;
 		_con_closed = true;
 		_down_socket.close();
 		_up_socket.close();
@@ -61,8 +81,6 @@ namespace thiproxy
 			}
 			else
 			{
-			
-				//std::cout << "HTTP: " << std::endl << _buffer_headers << std::endl;
 				std::string uri;
 				std::string port;
 				try
@@ -76,11 +94,9 @@ namespace thiproxy
 						_con_tunnel = true;
 					}
 
-
 				}
 				catch(const HttpHeader::ExceptionParseError &)
 				{
-					//std::cout << "HttpHeader parse error" << std::endl;
 					finish();
 				}
 
@@ -89,9 +105,6 @@ namespace thiproxy
 													boost::asio::placeholders::error,
 													boost::asio::placeholders::iterator));
 			}
-
-			
-			//std::cout << "Readed bytes" <<len << std::endl;
 		}
 		
 	}
@@ -103,8 +116,6 @@ namespace thiproxy
 			finish("Resolve");
 			return;
 		}
-
-		//std::cout << "[Resolved]" << std::endl;
 
 		_status = STATUS_CONNECTING;
 		_up_socket.async_connect(*iterator, boost::bind(&Session::callback_connect, shared_from_this(),boost::asio::placeholders::error) );
@@ -156,9 +167,6 @@ namespace thiproxy
 		boost::bind(&Session::callback_up_write, shared_from_this(),
 								boost::asio::placeholders::error,
 								boost::asio::placeholders::bytes_transferred));
-
-		//std::cout << "[Connected]" << std::endl;
-		//std::cout << "[Write UP] " << std::endl << _buffer_request << std::endl;
 	}
 
 	void Session::callback_up_write(const boost::system::error_code & error, size_t len)
@@ -175,8 +183,6 @@ namespace thiproxy
 		boost::bind(&Session::callback_up_read, shared_from_this(),
 								boost::asio::placeholders::error,
 								boost::asio::placeholders::bytes_transferred));
-
-		//std::cout << "[UP Write]" << std::endl;
 	}
 
 	void Session::callback_up_read(const boost::system::error_code & error, size_t len)
@@ -194,7 +200,6 @@ namespace thiproxy
 
 			_buffer_headers += std::string(_up_buffer.data(),len);
 
-			//std::cout << "[UP Read] " << len << std::string(_up_buffer.data(),len) << std::endl;
 			if(_buffer_headers.find("\r\n\r\n") == std::string::npos)
 			{
 				async_read(_up_socket, boost::asio::buffer(_up_buffer), boost::asio::transfer_at_least(1),
@@ -205,16 +210,10 @@ namespace thiproxy
 			}
 			else
 			{
-				//std::cout << "[UP HTTP]: " << std::endl << _buffer_headers << std::endl;
-
 				try
 				{
 					//HTTP Up response header
 					_http_header.from_buffer(_buffer_headers);
-					
-					//std::cout << "CONNECTION=" << _http_header.header("Connection") << std::endl;
-					//std::cout << "CONTENT-LENGTH=" << _http_header.header("Content-Length") << std::endl;
-
 				}
 				catch(const HttpHeader::ExceptionParseError &)
 				{
@@ -277,11 +276,8 @@ namespace thiproxy
 
 		if(!_con_closed)
 		{
-
 			if( (_body_io < _body_len) || (_body_len == 0) )
 			{
-				
-
 				async_read(_up_socket, boost::asio::buffer(_up_buffer,len), boost::asio::transfer_at_least(1),
 							    boost::bind(&Session::callback_up_read,
 								shared_from_this(),
@@ -311,15 +307,10 @@ namespace thiproxy
 	{
 		if(error)
 		{
-			//std::cout << "[Tunnel EOF] Down" << std::endl;
 			finish();
-			
 		}
 		else
 		{
-
-			
-
 			if(error != boost::asio::error::eof && len > 0)
 			{
 				std::vector<char> copy_data(len);
@@ -333,16 +324,11 @@ namespace thiproxy
 								shared_from_this(), 
 								boost::asio::placeholders::error,
 								boost::asio::placeholders::bytes_transferred));
-
-
 		}
 	}
 
 	void Session::callback_tunnel_down_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len)
 	{
-
-		//std::cout << "[Tunnel Write] Down" << write_size << " len " << len << std::endl;
-		
 		if(write_size > 0)
 		{
 			boost::asio::async_write(_down_socket, boost::asio::buffer(write_buffer,write_size),
@@ -352,24 +338,16 @@ namespace thiproxy
 									boost::asio::placeholders::error,
 									boost::asio::placeholders::bytes_transferred));
 		}
-
-
-	
-
 	}
 
 	void Session::callback_tunnel_up_read(const boost::system::error_code & error, size_t len)
 	{
-		if(error )
+		if(error)
 		{
-			//std::cout << "[Tunnel ERROR] Up" << std::endl;
 			finish();
-			
 		}
 		else
 		{
-		
-
 			if(error != boost::asio::error::eof && len > 0)
 			{
 				std::vector<char> copy_data(len);
@@ -378,20 +356,16 @@ namespace thiproxy
 				callback_tunnel_down_write(copy_data, len, boost::system::error_code(), len);
 			}
 			
-			
 			async_read(_up_socket, boost::asio::buffer(_up_buffer), boost::asio::transfer_at_least(1),
 						    boost::bind(&Session::callback_tunnel_up_read,
 							shared_from_this(), 
 							boost::asio::placeholders::error,
 							boost::asio::placeholders::bytes_transferred));
-
 		}
 	}
 
 	void Session::callback_tunnel_up_write(const std::vector<char> write_buffer ,std::size_t write_size, const boost::system::error_code & error, size_t len)
 	{
-		//std::cout << "[Tunnel Write] Up" << write_size <<  std::endl;
-		
 		if(write_size > 0)
 		{
 			boost::asio::async_write(_up_socket, boost::asio::buffer(write_buffer,write_size),
@@ -401,7 +375,6 @@ namespace thiproxy
 									boost::asio::placeholders::error,
 									boost::asio::placeholders::bytes_transferred));
 		}
-		
 	}
 }
 

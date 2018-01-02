@@ -13,7 +13,8 @@ SET(BOOST_LIBS libboost_thread-vc120-mt-1_58
 
 SET(SRC_FILES  src/thiproxy.cpp
                src/server.cpp
-               src/session.cpp)
+               src/session.cpp
+               src/http.cpp)
 
 ADD_EXECUTABLE(thiproxy ${SRC_FILES})
 TARGET_LINK_LIBRARIES(thiproxy ${BOOST_LIBS})
