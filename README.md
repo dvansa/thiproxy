@@ -16,17 +16,3 @@ mkdir build && cd build
 cmake -G "Visual Studio 12 2013 Win64" ..
 
 ```
-
-
-
-
-| Trigger                            | Action                            | Description
-|----------------------------------- | --------------------------------- | ----------
-| Ctrl+ Mouse at Top-Left corner     | SearchGoogleClipboardContent()    | Google search the current selected text  
-
-**TODO'S**
-  - Run as a Windows Service instead of executable.
-  - Compatibility with other OS (Linux/MAC),
-  - Add new Actions.
-  
- 
