@@ -22,14 +22,20 @@
 
 namespace thiproxy
 {
-	HttpHeader::HttpHeader() : _uri_port(80)
+	HttpHeader::HttpHeader() : _url_port(80)
 	{}
 
 	void HttpHeader::from_buffer(const std::string & buffer)
 	{
+		_buffer.clear();
+		_buffer.insert(_buffer.end(), buffer.begin(), buffer.end());
+
 		//First line
 		auto p = str_find_or_throw(buffer, "\r\n");
 		std::string first_line = buffer.substr(0,p);
+
+		_request = first_line;
+
 		std::string headers = buffer.substr(p+1);
 
 		p = str_find_or_throw(first_line, "HTTP");
@@ -46,43 +52,43 @@ namespace thiproxy
 			first_line = first_line.substr(p+1);
 			p = str_find_or_throw(first_line, " ");
 
-			//host URI
-			_uri = first_line.substr(0,p);
+			//host URL
+			_url = first_line.substr(0,p);
 
 			//Http version
 			_version = first_line.substr(p + 6); // "HTTP/"
 
-			std::string tmpuri = _uri;
+			std::string tmpurl = _url;
 
-			auto p0 = tmpuri.find("://");
+			auto p0 = tmpurl.find("://");
 			if(p0 != std::string::npos)
 			{
-				tmpuri[p0 + 0] = tmpuri[p0 + 1] = tmpuri[p0 + 2] = 'X';
+				tmpurl[p0 + 0] = tmpurl[p0 + 1] = tmpurl[p0 + 2] = 'X';
 				p0 += 3;
 			} 
 			else
 				p0 = 0;
 
-			auto p1 = tmpuri.find("/");
+			auto p1 = tmpurl.find("/");
 
-			auto p2 = tmpuri.find(":");
+			auto p2 = tmpurl.find(":");
 
 			if(p2 != std::string::npos)
 			{
-				_uri_port = atoi(tmpuri.substr(p2 + 1).c_str());
+				_url_port = atoi(tmpurl.substr(p2 + 1).c_str());
 
-				if(_uri_port == 0)
-					_uri_port = 80;
+				if(_url_port == 0)
+					_url_port = 80;
 			}
 
-			_uri = _uri.substr( p0 , std::min(p1,p2) - p0);
+			_url = _url.substr( p0 , std::min(p1,p2) - p0);
 		}
 
 		//Print
 		//std::cout << "HTTP:" << std::endl;
 		//std::cout << "\taction=" << _action << std::endl;
-		//std::cout << "\turi=" << _uri << std::endl;
-		//std::cout << "\tport=" << _uri_port << std::endl;
+		//std::cout << "\turl=" << _url << std::endl;
+		//std::cout << "\tport=" << _url_port << std::endl;
 		//std::cout << "\tversion=" << _version << std::endl;
 
 		//Read headers
@@ -103,12 +109,63 @@ namespace thiproxy
 		
 	}
 
+	void HttpHeader::from_buffer(const HttpBuffer & buffer)
+	{
+		_buffer = buffer;
+		HttpHeader::from_buffer(std::string(buffer.begin(), buffer.end()));
+	}
+
 	std::string::size_type HttpHeader::str_find_or_throw(const std::string & str, const std::string & pattern)
 	{
 		std::string::size_type p = str.find(pattern);
 		if(p == std::string::npos)
 			throw ExceptionParseError();
 		return p;
+	}
+
+	HttpBuffer HttpHeader::to_buffer() const
+	{
+		std::vector<char> buffer;
+
+		buffer.insert(buffer.begin(), _request.begin(), _request.end());
+		buffer.push_back('\r');
+		buffer.push_back('\n');
+
+		for(auto& h : _headers)
+		{
+			buffer.insert(buffer.end(), h.first.begin(), h.first.end() );
+			buffer.push_back(':');
+			buffer.push_back(' ');
+			buffer.insert(buffer.end(), h.second.begin(), h.second.end() );
+			buffer.push_back('\r');
+			buffer.push_back('\n');
+		}
+
+		buffer.push_back('\r');
+		buffer.push_back('\n');
+
+		return buffer;
+	}
+
+	std::size_t HttpHeader::size()
+	{
+		//If buffer is not generated create it
+		if(_buffer.size() == 0)
+			_buffer = to_buffer();
+
+		return _buffer.size();
+	}
+
+	HttpBuffer HttpMessage::to_buffer() const
+	{
+		std::vector<char> buffer, buffer_header;
+
+		buffer_header = header.to_buffer();
+
+		buffer.insert(buffer.end(), buffer_header.begin(), buffer_header.end());
+		buffer.insert(buffer.end(), content.begin(), content.end());
+
+		return buffer;
 	}
 }
 

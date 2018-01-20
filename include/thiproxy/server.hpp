@@ -44,6 +44,7 @@ namespace thiproxy
 	class Server
 	{
 	public:
+
 		// Setup server on specific port
 		Server(int port = 9000);
 
@@ -52,6 +53,12 @@ namespace thiproxy
 
 		//Stops server
 		void stop();
+
+		//Assign Session controller
+		void assign_session_controller(SessionController * controller)
+		{
+			_session_controller = controller;
+		}
 
 	private:
 
@@ -69,8 +76,13 @@ namespace thiproxy
 		boost::shared_ptr<boost::asio::ip::tcp::acceptor> _acceptor;
 		
 		boost::asio::ip::tcp::socket _socket;
-		std::set<boost::shared_ptr<thiproxy::Session>> _sessions;
+		std::set<boost::shared_ptr<Session>> _sessions;
+
+		//Session controller
+		SessionController * _session_controller;
 	};
+
+
 }
 
 #endif

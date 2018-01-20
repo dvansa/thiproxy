@@ -44,6 +44,59 @@
 
 namespace thiproxy
 {
+
+	//
+	//SessionAction.
+	//Actions returned by session user callbacks
+	struct SessionAction
+	{
+		enum 
+		{
+			ACTION_FORWARD = 0, 	//Forwards HTTP request to the remote specified on the 'message'
+			ACTION_CLOSE_CONNECTION, // Closes Session connection
+			ACTION_USER_MESSAGE // Replies with a cstom user 'message'
+		};
+
+		//Action type
+		int type;
+
+		//HTTP output message
+		HttpMessage message;
+	};
+
+	//
+	// Session Controller.
+	// Defines Session behaviour by implementing its callbacks 
+	// Callbacks recieve  HTTP requests/responses and return an associated
+	// SessionAction.
+	class SessionController
+	{
+	public:
+
+		SessionController(){}
+
+		//On down-socket provides a HTTP request
+		//Default behaviour : forward request to 'up' connection
+		virtual SessionAction on_down_request(const HttpMessage & down_msg)
+		{
+			SessionAction res;
+			res.type = SessionAction::ACTION_FORWARD;
+			res.message = down_msg;
+			return res;
+		}
+
+		//On up-socket provides a HTTP response
+		//Default behaviour : forward response to 'down' connection
+		//TODO : Unused by Session. Now is forwarding all 'up' connection responses to 'down'
+		virtual SessionAction on_up_response(const HttpMessage & up_msg)
+		{
+			SessionAction res;
+			res.type = SessionAction::ACTION_FORWARD;
+			res.message = up_msg;
+			return res;
+		}
+	};
+
 	//
 	// Proxy Session.
 	// Starts on accepted connection.
@@ -65,6 +118,8 @@ namespace thiproxy
 		//Create session from a connected socket to DOWN
 		Session(boost::asio::ip::tcp::socket & socket);
 
+		void set_controller(SessionController * controller);
+
 		//Start session
 		void start();
 
@@ -74,11 +129,26 @@ namespace thiproxy
 		//Check connection status
 		bool is_closed() const { return _con_closed; }
 
+		//Callbacks
+
+		//On down-socket provides a HTTP request
+		SessionAction on_down_request(const HttpMessage & down_msg)
+		{
+			return _session_controller->on_down_request(down_msg);
+		}
+
+		//On up-socket provides a HTTP response
+		SessionAction on_up_response(const HttpMessage & up_msg)
+		{
+			return _session_controller->on_up_response(up_msg);
+		}
+
 	private:
 
 		//Socket callbacks
 		void callback_down_read(const boost::system::error_code & error, size_t len);
 		void callback_down_write(const boost::system::error_code & error, size_t len);
+		void callback_down_write_usermsg(const boost::system::error_code & error, size_t len);
 
 		void callback_up_read(const boost::system::error_code & error, size_t len);
 		void callback_up_write(const boost::system::error_code & error, size_t len);
@@ -97,6 +167,9 @@ namespace thiproxy
 		//Session status
 		int _status;
 
+		//Session controller
+		SessionController * _session_controller;
+
 		//Sockets
 		boost::asio::ip::tcp::socket _down_socket; // browser <-> proxy
 		boost::asio::ip::tcp::socket _up_socket; // proxy <-> remote
@@ -108,6 +181,9 @@ namespace thiproxy
 		//Send/Recv buffers
 		std::string _buffer_headers;
 		std::string _buffer_request;
+
+		//User buffers
+		std::vector<char> _buffer_user;
 
 		//HTTP body sending
 		std::size_t _body_len;
@@ -125,6 +201,8 @@ namespace thiproxy
 		//Host resolver
 		boost::asio::ip::tcp::resolver _address_resolver;
 	};
+
+	
 }
 
 #endif

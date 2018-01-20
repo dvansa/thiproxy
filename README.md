@@ -5,6 +5,7 @@ Thin HTTP proxy server written in C++
 Features:
   - Bridges HTTP requests
   - Establishes TCP connections for HTTP "CONNECT" (ie. https)
+  - User defined behaviour with SessionController/SessionAction
 
 ## Dependencies
   - [Boost.Asio](https://http://www.boost.org/doc/libs/master/doc/html/boost_asio.html)

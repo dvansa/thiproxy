@@ -52,8 +52,10 @@ namespace thiproxy
 		//Clean finished sessions
 		clean_sessions();
 
-		boost::shared_ptr<thiproxy::Session> new_session = boost::make_shared<thiproxy::Session>(_socket);
+		boost::shared_ptr<Session> new_session = boost::make_shared<Session>(_socket);
 		_sessions.insert(new_session);
+
+		new_session->set_controller(_session_controller);
 		new_session->start();
 
 		std::cout << "[Session Started] Current sessions " << _sessions.size() << std::endl;
@@ -64,7 +66,7 @@ namespace thiproxy
 
 	void Server::clean_sessions()
 	{
-		std::set<boost::shared_ptr<thiproxy::Session>> _to_remove;
+		std::set<boost::shared_ptr<Session>> _to_remove;
 		for(auto& s : _sessions)
 		{
 			if(s->is_closed())
@@ -79,5 +81,7 @@ namespace thiproxy
 		for(auto& rs : _to_remove)
 			_sessions.erase(rs);
 	}
+
+
 }
 

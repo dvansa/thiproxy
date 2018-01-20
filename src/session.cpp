@@ -34,6 +34,11 @@ namespace thiproxy
 		
 	}
 
+	void Session::set_controller(SessionController * controller)
+	{
+		_session_controller = controller;
+	}
+
 	void Session::start()
 	{
 		_con_closed = false;
@@ -81,29 +86,63 @@ namespace thiproxy
 			}
 			else
 			{
-				std::string uri;
+				std::string url;
 				std::string port;
+
 				try
 				{
+					//Interpret Down HTTP Header
 					_http_header_req.from_buffer(_buffer_headers);
-					uri = _http_header_req.uri();
-					port = std::to_string(_http_header_req.uri_port());
 
-					if(_http_header_req.action() == "CONNECT")
-					{
-						_con_tunnel = true;
-					}
-
+					
 				}
 				catch(const HttpHeader::ExceptionParseError &)
 				{
 					finish();
 				}
 
-				boost::asio::ip::tcp::resolver::query q(uri, port);
-				_address_resolver.async_resolve(q,boost::bind(&Session::callback_resolve, shared_from_this(),
-													boost::asio::placeholders::error,
-													boost::asio::placeholders::iterator));
+				//Process request callback
+				SessionAction action = on_down_request(HttpMessage(HttpMessage::HTTP_REQUEST,_http_header_req));
+
+				if(action.type == SessionAction::ACTION_FORWARD)
+				{
+					//Connect to 'up' and forward HTTP request
+
+					url = _http_header_req.url();
+					port = std::to_string(_http_header_req.url_port());
+
+					if(_http_header_req.action() == "CONNECT")
+					{
+						_con_tunnel = true;
+					}
+
+					boost::asio::ip::tcp::resolver::query q(url, port);
+					_address_resolver.async_resolve(q,boost::bind(&Session::callback_resolve, shared_from_this(),
+														boost::asio::placeholders::error,
+														boost::asio::placeholders::iterator));
+				}
+				else if(action.type == SessionAction::ACTION_USER_MESSAGE)
+				{
+					//Send user defined response message to 'down'
+					_buffer_user = action.message.to_buffer();
+
+					boost::asio::async_write(_down_socket, boost::asio::buffer(_buffer_user),
+					boost::bind(&Session::callback_down_write_usermsg, shared_from_this(),
+											boost::asio::placeholders::error,
+											boost::asio::placeholders::bytes_transferred));
+				}
+				else if(action.type == SessionAction::ACTION_CLOSE_CONNECTION)
+				{
+					//Close connection and session
+					finish();
+				}
+				else
+				{
+					//Unhandled, finish session
+					finish();
+				}
+
+				
 			}
 		}
 		
@@ -217,9 +256,10 @@ namespace thiproxy
 				}
 				catch(const HttpHeader::ExceptionParseError &)
 				{
-					//std::cout << "HttpHeader parse error" << std::endl;
 					finish("Parse Error Up");
 				}
+
+				
 
 				std::string body_len = _http_header.header("Content-Length");
 				_body_len = (body_len != "") ? atoi(body_len.c_str()) : 0;
@@ -300,7 +340,17 @@ namespace thiproxy
 		{
 			finish("Con Closed");
 		}
+	}
 
+	void Session::callback_down_write_usermsg(const boost::system::error_code & error, size_t len)
+	{
+		if(error)
+		{
+			finish("Error down write usermsg");
+			return;
+		}
+
+		finish("Con Closed");
 	}
 
 	void Session::callback_tunnel_down_read(const boost::system::error_code & error, size_t len)
